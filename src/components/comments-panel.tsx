@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Send, Check, MessageSquarePlus, Undo2, X } from "lucide-react";
+import type { Socket } from "socket.io-client";
 import { apiFetch, ApiError } from "@/lib/api";
 
 export type Selection = { from: number; to: number; text: string };
