@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Sparkles, Users, Zap, FileText } from "lucide-react";
@@ -189,6 +189,11 @@ function LoginForm({ onSuccess }: { onSuccess: (t: string, u: User) => void }) {
       <Field label="Password" type="password" value={password} onChange={setPassword} error={errors.password} required />
       {errors.form && <p className="text-sm text-destructive">{errors.form}</p>}
       <SubmitButton loading={loading}>Sign In</SubmitButton>
+      <div className="text-center">
+        <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
+          Forgot your password?
+        </Link>
+      </div>
     </form>
   );
 }
