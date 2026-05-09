@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Loader2, Send, Check, MessageSquarePlus, Undo2, X } from "lucide-react";
+import type { Socket } from "socket.io-client";
 import { apiFetch, ApiError } from "@/lib/api";
 
 export type Selection = { from: number; to: number; text: string };
@@ -23,11 +24,12 @@ interface Props {
   documentId: string;
   token: string | null;
   selection: Selection | null;
+  socket?: Socket | null;
   open: boolean;
   onClose: () => void;
 }
 
-export function CommentsPanel({ documentId, token, selection, open, onClose }: Props) {
+export function CommentsPanel({ documentId, token, selection, socket, open, onClose }: Props) {
   const [threads, setThreads] = useState<Thread[] | null>(null);
   const [showResolved, setShowResolved] = useState(false);
   const [newBody, setNewBody] = useState("");
@@ -59,6 +61,23 @@ export function CommentsPanel({ documentId, token, selection, open, onClose }: P
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, documentId, token, showResolved]);
+
+  useEffect(() => {
+    if (!open || !socket) return;
+    const onRefresh = (next: Thread[]) => {
+      if (Array.isArray(next)) setThreads(next);
+    };
+    const onAny = () => void load();
+    socket.on("comments:refresh", onRefresh);
+    socket.on("comment:new_thread", onAny);
+    socket.on("comment:new_reply", onAny);
+    return () => {
+      socket.off("comments:refresh", onRefresh);
+      socket.off("comment:new_thread", onAny);
+      socket.off("comment:new_reply", onAny);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, socket, documentId, token, showResolved]);
 
   const createThread = async () => {
     if (!token || !newBody.trim()) return;
