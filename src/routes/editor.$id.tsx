@@ -2,12 +2,15 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
-import { ArrowLeft, Type, Code2, Check, Loader2, Share2 } from "lucide-react";
+import { ArrowLeft, Type, Code2, Check, Loader2, Share2, MessageSquare, History, Sparkles } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { API_BASE_URL, STORAGE_KEYS } from "@/lib/config";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ShareDialog } from "@/components/share-dialog";
+import { CommentsPanel, type Selection } from "@/components/comments-panel";
+import { VersionsPanel } from "@/components/versions-panel";
+import { AiAssist } from "@/components/ai-assist";
 
 type DocumentDetail = {
   id: string;
@@ -26,6 +29,7 @@ type PresenceUser = {
 
 type SaveStatus = "idle" | "saving" | "saved";
 type FontMode = "serif" | "mono";
+type SidePanel = "comments" | "versions" | "ai" | null;
 
 export const Route = createFileRoute("/editor/$id")({
   beforeLoad: () => {
@@ -47,6 +51,8 @@ function Editor() {
   const [status, setStatus] = useState<SaveStatus>("idle");
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [panel, setPanel] = useState<SidePanel>(null);
+  const [selection, setSelection] = useState<Selection | null>(null);
   const [fontMode, setFontMode] = useState<FontMode>(() => {
     if (typeof window === "undefined") return "serif";
     return localStorage.getItem("collab_font_mode") === "mono" ? "mono" : "serif";
@@ -58,6 +64,7 @@ function Editor() {
   const socketRef = useRef<Socket | null>(null);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const skipNextEmit = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Load document
   useEffect(() => {
@@ -125,22 +132,14 @@ function Editor() {
     if (!doc || !token) return;
     if (title === doc.title) return;
     const t = setTimeout(() => {
-      apiFetch("PATCH", `/documents/${doc.id}`, { title }, token).catch(() => {
-        // ignore — backend may use socket only
-      });
+      apiFetch("PATCH", `/documents/${doc.id}`, { title }, token).catch(() => {});
     }, 800);
     return () => clearTimeout(t);
   }, [title, doc, token]);
 
-  const onContentChange = (next: string) => {
-    setContent(next);
-    if (skipNextEmit.current) {
-      skipNextEmit.current = false;
-      return;
-    }
+  const emitContent = (next: string) => {
     const socket = socketRef.current;
     if (!socket || !doc) return;
-
     socket.emit("document:update", { documentId: doc.id, content: next });
     setStatus("saving");
     if (savedTimer.current) clearTimeout(savedTimer.current);
@@ -148,6 +147,40 @@ function Editor() {
       setStatus("saved");
       setLastSavedAt(new Date());
     }, 2500);
+  };
+
+  const onContentChange = (next: string) => {
+    setContent(next);
+    if (skipNextEmit.current) {
+      skipNextEmit.current = false;
+      return;
+    }
+    emitContent(next);
+  };
+
+  const trackSelection = () => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const from = el.selectionStart;
+    const to = el.selectionEnd;
+    if (from === to) {
+      setSelection(null);
+      return;
+    }
+    setSelection({ from, to, text: content.slice(from, to) });
+  };
+
+  const replaceSelection = (text: string) => {
+    if (!selection) return;
+    const next = content.slice(0, selection.from) + text + content.slice(selection.to);
+    setContent(next);
+    emitContent(next);
+  };
+
+  const appendText = (text: string) => {
+    const next = content + (content && !content.endsWith("\n") ? "\n\n" : "") + text;
+    setContent(next);
+    emitContent(next);
   };
 
   // Warn the user before they close/reload the tab while a save is in flight
@@ -179,95 +212,147 @@ function Editor() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
-      {/* Top bar */}
-      <header className="border-b border-border bg-card/50 backdrop-blur sticky top-0 z-30">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center justify-center w-9 h-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition"
-            aria-label="Back to dashboard"
-          >
-            <ArrowLeft size={16} />
-          </Link>
-          <input
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Untitled"
-            className="flex-1 bg-transparent text-base font-semibold focus:outline-none focus:bg-secondary rounded px-2 py-1.5 transition min-w-0"
-          />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShareOpen(true)}
-              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-accent transition"
-              title="Share document"
+    <div className="min-h-screen flex bg-background text-foreground">
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className="border-b border-border bg-card/50 backdrop-blur sticky top-0 z-30">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-2">
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center justify-center w-9 h-9 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition"
+              aria-label="Back to dashboard"
             >
-              <Share2 size={14} />
-              <span className="hidden sm:inline">Share</span>
-            </button>
-            <button
-              onClick={() => setFontMode((f) => (f === "serif" ? "mono" : "serif"))}
-              className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition"
-              title={fontMode === "serif" ? "Switch to mono" : "Switch to serif"}
-            >
-              {fontMode === "serif" ? <Code2 size={15} /> : <Type size={15} />}
-            </button>
-            <ThemeToggle />
-            <PresenceStack users={presence} />
+              <ArrowLeft size={16} />
+            </Link>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Untitled"
+              className="flex-1 bg-transparent text-base font-semibold focus:outline-none focus:bg-secondary rounded px-2 py-1.5 transition min-w-0"
+            />
+            <div className="flex items-center gap-1.5">
+              <PanelButton active={panel === "ai"} onClick={() => setPanel(panel === "ai" ? null : "ai")} title="AI assistant">
+                <Sparkles size={14} />
+              </PanelButton>
+              <PanelButton active={panel === "comments"} onClick={() => setPanel(panel === "comments" ? null : "comments")} title="Comments">
+                <MessageSquare size={14} />
+              </PanelButton>
+              <PanelButton active={panel === "versions"} onClick={() => setPanel(panel === "versions" ? null : "versions")} title="Version history">
+                <History size={14} />
+              </PanelButton>
+              <button
+                onClick={() => setShareOpen(true)}
+                className="inline-flex items-center gap-1.5 h-9 px-3 rounded-md border border-border bg-card text-sm font-medium text-foreground hover:bg-accent transition"
+                title="Share document"
+              >
+                <Share2 size={14} />
+                <span className="hidden sm:inline">Share</span>
+              </button>
+              <button
+                onClick={() => setFontMode((f) => (f === "serif" ? "mono" : "serif"))}
+                className="hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-md border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition"
+                title={fontMode === "serif" ? "Switch to mono" : "Switch to serif"}
+              >
+                {fontMode === "serif" ? <Code2 size={15} /> : <Type size={15} />}
+              </button>
+              <ThemeToggle />
+              <PresenceStack users={presence} />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <ShareDialog
-        documentId={doc.id}
-        token={token}
-        open={shareOpen}
-        onOpenChange={setShareOpen}
-      />
+        <ShareDialog
+          documentId={doc.id}
+          token={token}
+          open={shareOpen}
+          onOpenChange={setShareOpen}
+        />
 
-      {/* Editor */}
-      <main className="flex-1">
-        <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10 sm:py-14 min-h-[calc(100dvh-7.5rem)]">
-          <textarea
-            value={content}
-            onChange={(e) => onContentChange(e.target.value)}
-            placeholder="Start writing…"
-            className={`w-full h-full bg-transparent resize-none focus:outline-none text-foreground placeholder-muted-foreground ${
-              fontMode === "serif"
-                ? "font-serif-editor text-[18px] leading-[1.75]"
-                : "font-mono-editor text-[15px] leading-relaxed"
-            }`}
-            spellCheck
-          />
-        </div>
-      </main>
-
-      {/* Status bar */}
-      <footer className="border-t border-border bg-card/50 backdrop-blur">
-        <div className="max-w-5xl mx-auto px-6 py-2 text-xs text-muted-foreground flex justify-between items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <SaveIndicator status={status} lastSavedAt={lastSavedAt} />
-            <span className="hidden sm:inline">·</span>
-            <span>{stats.words.toLocaleString()} words</span>
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{stats.chars.toLocaleString()} chars</span>
-            <span className="hidden sm:inline">·</span>
-            <span className="hidden sm:inline">{stats.minutes} min read</span>
+        <main className="flex-1">
+          <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10 sm:py-14 min-h-[calc(100dvh-7.5rem)]">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => onContentChange(e.target.value)}
+              onSelect={trackSelection}
+              onKeyUp={trackSelection}
+              onMouseUp={trackSelection}
+              placeholder="Start writing…"
+              className={`w-full h-full bg-transparent resize-none focus:outline-none text-foreground placeholder-muted-foreground ${
+                fontMode === "serif"
+                  ? "font-serif-editor text-[18px] leading-[1.75]"
+                  : "font-mono-editor text-[15px] leading-relaxed"
+              }`}
+              spellCheck
+            />
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1.5">
-              <kbd>⌘</kbd>
-              <kbd>S</kbd>
-              <span>auto-saves</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-              {presence.length} online
-            </span>
+        </main>
+
+        <footer className="border-t border-border bg-card/50 backdrop-blur">
+          <div className="max-w-5xl mx-auto px-6 py-2 text-xs text-muted-foreground flex justify-between items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-3">
+              <SaveIndicator status={status} lastSavedAt={lastSavedAt} />
+              <span className="hidden sm:inline">·</span>
+              <span>{stats.words.toLocaleString()} words</span>
+              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline">{stats.chars.toLocaleString()} chars</span>
+              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline">{stats.minutes} min read</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                {presence.length} online
+              </span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      </div>
+
+      {panel === "comments" && (
+        <CommentsPanel
+          documentId={doc.id}
+          token={token}
+          selection={selection}
+          open
+          onClose={() => setPanel(null)}
+        />
+      )}
+      {panel === "versions" && (
+        <VersionsPanel
+          documentId={doc.id}
+          token={token}
+          open
+          onClose={() => setPanel(null)}
+          onRestored={(c) => { setContent(c); emitContent(c); }}
+        />
+      )}
+      {panel === "ai" && (
+        <AiAssist
+          documentId={doc.id}
+          token={token}
+          selection={selection?.text ?? ""}
+          open
+          onClose={() => setPanel(null)}
+          onReplace={replaceSelection}
+          onAppend={appendText}
+        />
+      )}
     </div>
+  );
+}
+
+function PanelButton({ active, onClick, title, children }: { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      aria-pressed={active}
+      className={`inline-flex items-center justify-center w-9 h-9 rounded-md border transition ${
+        active ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent"
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
