@@ -5,7 +5,7 @@ import { FileText, Loader2 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { ThemeToggle } from "@/components/theme-toggle";
 
-export const Route = createFileRoute("/auth/reset-password")({
+export const Route = createFileRoute("/auth/auth/reset-password")({
   validateSearch: (search: Record<string, unknown>) => ({
     token: typeof search.token === "string" ? search.token : "",
   }),
@@ -35,7 +35,7 @@ function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      await apiFetch("POST", "/auth/reset-password", { token, password });
+      await apiFetch("POST", "/auth/auth/reset-password", { token, password });
       toast.success("Password updated — please sign in.");
       navigate({ to: "/auth" });
     } catch (err) {
