@@ -14,6 +14,7 @@ import {
   LayoutGrid,
   List,
   Check,
+  UserCircle2,
 } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
@@ -83,6 +84,8 @@ function Dashboard() {
   const [pendingDelete, setPendingDelete] = useState<DocumentItem | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [renameTarget, setRenameTarget] = useState<DocumentItem | null>(null);
+  const [searchHits, setSearchHits] = useState<DocumentItem[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem(SORT_KEY, sort);
@@ -107,8 +110,26 @@ function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
+  // Debounced server-side search (>= 2 chars). Falls back to local filter on failure.
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2 || !token) {
+      setSearchHits(null);
+      return;
+    }
+    setSearching(true);
+    const t = setTimeout(() => {
+      apiFetch<DocumentItem[]>("GET", `/search?q=${encodeURIComponent(q)}&limit=30`, undefined, token)
+        .then((rows) => setSearchHits(Array.isArray(rows) ? rows : []))
+        .catch(() => setSearchHits(null))
+        .finally(() => setSearching(false));
+    }, 250);
+    return () => { clearTimeout(t); setSearching(false); };
+  }, [query, token]);
+
   const filtered = useMemo(() => {
     if (!docs) return null;
+    if (searchHits) return searchHits;
     const q = query.trim().toLowerCase();
     let out = q ? docs.filter((d) => d.title.toLowerCase().includes(q)) : docs;
     out = [...out].sort((a, b) => {
@@ -118,7 +139,7 @@ function Dashboard() {
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
     return out;
-  }, [docs, query, sort]);
+  }, [docs, query, sort, searchHits]);
 
   const handleDelete = async () => {
     if (!pendingDelete || !token) return;
@@ -159,12 +180,15 @@ function Dashboard() {
           </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary text-sm">
+            <Link to="/profile" className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary text-sm hover:bg-accent transition" title="Profile & shared with me">
               <div className="w-6 h-6 rounded-full gradient-bg flex items-center justify-center text-xs font-semibold text-primary-foreground">
                 {(user?.name?.[0] ?? "?").toUpperCase()}
               </div>
               <span className="text-foreground font-medium">{user?.name}</span>
-            </div>
+            </Link>
+            <Link to="/profile" className="sm:hidden p-1.5 rounded-md border border-border hover:bg-accent" aria-label="Profile">
+              <UserCircle2 size={16} />
+            </Link>
             <button
               onClick={logout}
               className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border rounded-md hover:bg-accent transition active:scale-95"
@@ -201,8 +225,9 @@ function Dashboard() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search documents…"
-              className="w-full pl-9 pr-3 py-2 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
+              className="w-full pl-9 pr-9 py-2 bg-card border border-border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring transition"
             />
+            {searching && <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
