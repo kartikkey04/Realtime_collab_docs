@@ -321,6 +321,7 @@ function Editor() {
           documentId={doc.id}
           token={token}
           selection={selection}
+          socket={socketRef.current}
           open
           onClose={() => setPanel(null)}
         />
