@@ -24,11 +24,12 @@ interface Props {
   documentId: string;
   token: string | null;
   selection: Selection | null;
+  socket?: Socket | null;
   open: boolean;
   onClose: () => void;
 }
 
-export function CommentsPanel({ documentId, token, selection, open, onClose }: Props) {
+export function CommentsPanel({ documentId, token, selection, socket, open, onClose }: Props) {
   const [threads, setThreads] = useState<Thread[] | null>(null);
   const [showResolved, setShowResolved] = useState(false);
   const [newBody, setNewBody] = useState("");
