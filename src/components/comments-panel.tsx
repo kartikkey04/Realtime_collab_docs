@@ -62,6 +62,23 @@ export function CommentsPanel({ documentId, token, selection, socket, open, onCl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, documentId, token, showResolved]);
 
+  useEffect(() => {
+    if (!open || !socket) return;
+    const onRefresh = (next: Thread[]) => {
+      if (Array.isArray(next)) setThreads(next);
+    };
+    const onAny = () => void load();
+    socket.on("comments:refresh", onRefresh);
+    socket.on("comment:new_thread", onAny);
+    socket.on("comment:new_reply", onAny);
+    return () => {
+      socket.off("comments:refresh", onRefresh);
+      socket.off("comment:new_thread", onAny);
+      socket.off("comment:new_reply", onAny);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, socket, documentId, token, showResolved]);
+
   const createThread = async () => {
     if (!token || !newBody.trim()) return;
     setPosting(true);
