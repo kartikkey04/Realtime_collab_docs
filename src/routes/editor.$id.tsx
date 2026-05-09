@@ -170,6 +170,13 @@ function Editor() {
     setSelection({ from, to, text: content.slice(from, to) });
   };
 
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [content]);
+
   const replaceSelection = (text: string) => {
     if (!selection) return;
     const next = content.slice(0, selection.from) + text + content.slice(selection.to);
@@ -268,7 +275,7 @@ function Editor() {
         />
 
         <main className="flex-1">
-          <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10 sm:py-14 min-h-[calc(100dvh-7.5rem)]">
+          <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10 sm:py-14 flex flex-col min-h-[calc(100dvh-7.5rem)]">
             <textarea
               ref={textareaRef}
               value={content}
@@ -277,7 +284,8 @@ function Editor() {
               onKeyUp={trackSelection}
               onMouseUp={trackSelection}
               placeholder="Start writing…"
-              className={`w-full h-full bg-transparent resize-none focus:outline-none text-foreground placeholder-muted-foreground ${
+              rows={1}
+              className={`w-full flex-1 min-h-[60vh] bg-transparent resize-none focus:outline-none overflow-hidden text-foreground placeholder-muted-foreground ${
                 fontMode === "serif"
                   ? "font-serif-editor text-[18px] leading-[1.75]"
                   : "font-mono-editor text-[15px] leading-relaxed"
