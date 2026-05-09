@@ -170,6 +170,13 @@ function Editor() {
     setSelection({ from, to, text: content.slice(from, to) });
   };
 
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [content]);
+
   const replaceSelection = (text: string) => {
     if (!selection) return;
     const next = content.slice(0, selection.from) + text + content.slice(selection.to);
