@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
-import { ArrowLeft, Type, Code2, Check, Loader2, Share2, MessageSquare, History, Sparkles } from "lucide-react";
+import { ArrowLeft, Type, Code2, Check, Loader2, Share2, MessageSquare, History, Sparkles, UserCircle2, LogOut, LayoutGrid } from "lucide-react";
 import { apiFetch } from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
 import { API_BASE_URL, STORAGE_KEYS } from "@/lib/config";
@@ -11,6 +11,12 @@ import { ShareDialog } from "@/components/share-dialog";
 import { CommentsPanel, type Selection } from "@/components/comments-panel";
 import { VersionsPanel } from "@/components/versions-panel";
 import { AiAssist } from "@/components/ai-assist";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type DocumentDetail = {
   id: string;
@@ -38,7 +44,7 @@ export const Route = createFileRoute("/editor/$id")({
 
 function Editor() {
   const { id } = Route.useParams();
-  const { token } = useAuth();
+  const { token, user, logout } = useAuth();
   const navigate = useNavigate();
 
 useEffect(() => {
@@ -266,7 +272,39 @@ useEffect(() => {
                 {fontMode === "serif" ? <Code2 size={15} /> : <Type size={15} />}
               </button>
               <ThemeToggle />
+              <div className="h-6 w-[1px] bg-border mx-1" />
               <PresenceStack users={presence} />
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center justify-center w-8 h-8 rounded-full gradient-bg text-primary-foreground text-xs font-bold shadow-sm hover:scale-105 transition-transform overflow-hidden">
+                    {user?.avatar ? (
+                      <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      (user?.name?.[0] ?? user?.phoneNumber?.[2] ?? "?").toUpperCase()
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56 mt-2">
+                  <div className="px-2 py-2 border-b border-border mb-1">
+                    <p className="text-sm font-semibold truncate">{user?.name || "User"}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.phoneNumber || user?.email || "Signed in"}</p>
+                  </div>
+                  <DropdownMenuItem onClick={() => navigate({ to: "/profile" })} className="cursor-pointer gap-2">
+                    <UserCircle2 size={14} />
+                    My Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate({ to: "/dashboard" })} className="cursor-pointer gap-2">
+                    <LayoutGrid size={14} />
+                    Dashboard
+                  </DropdownMenuItem>
+                  <div className="h-[1px] bg-border my-1" />
+                  <DropdownMenuItem onClick={logout} className="cursor-pointer gap-2 text-destructive focus:text-destructive">
+                    <LogOut size={14} />
+                    Sign Out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
@@ -278,24 +316,26 @@ useEffect(() => {
           onOpenChange={setShareOpen}
         />
 
-        <main className="flex-1">
-          <div className="max-w-3xl mx-auto px-6 sm:px-10 py-10 sm:py-14 flex flex-col min-h-[calc(100dvh-7.5rem)]">
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => onContentChange(e.target.value)}
-              onSelect={trackSelection}
-              onKeyUp={trackSelection}
-              onMouseUp={trackSelection}
-              placeholder="Start writing…"
-              rows={1}
-              className={`w-full flex-1 min-h-[60vh] bg-transparent resize-none focus:outline-none overflow-hidden text-foreground placeholder-muted-foreground ${
-                fontMode === "serif"
-                  ? "font-serif-editor text-[18px] leading-[1.75]"
-                  : "font-mono-editor text-[15px] leading-relaxed"
-              }`}
-              spellCheck
-            />
+        <main className="flex-1 overflow-y-auto bg-muted/30">
+          <div className="max-w-4xl mx-auto px-4 py-8 sm:py-12 min-h-full flex flex-col">
+            <div className="flex-1 bg-card border border-border shadow-card rounded-lg p-8 sm:p-16 min-h-[842px] transition-all duration-300">
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => onContentChange(e.target.value)}
+                onSelect={trackSelection}
+                onKeyUp={trackSelection}
+                onMouseUp={trackSelection}
+                placeholder="Start writing…"
+                rows={1}
+                className={`w-full bg-transparent resize-none focus:outline-none overflow-hidden text-foreground placeholder-muted-foreground ${
+                  fontMode === "serif"
+                    ? "font-serif-editor text-[18px] leading-[1.75]"
+                    : "font-mono-editor text-[15px] leading-relaxed"
+                }`}
+                spellCheck
+              />
+            </div>
           </div>
         </main>
 
