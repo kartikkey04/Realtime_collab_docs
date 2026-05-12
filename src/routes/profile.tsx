@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { ArrowLeft, FileText, Clock, Loader2, Save } from "lucide-react";
@@ -11,15 +11,16 @@ type Profile = { id: string; email: string; name: string; bio?: string | null; a
 type SharedDoc = { id: string; title: string; updatedAt: string; ownerName?: string };
 
 export const Route = createFileRoute("/profile")({
-  beforeLoad: () => {
-    const t = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.token) : null;
-    if (!t) throw redirect({ to: "/auth" });
-  },
+  ssr: false,
   component: ProfilePage,
 });
 
 function ProfilePage() {
   const { token, setSession, user: authUser } = useAuth();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (!token) navigate({ to: "/auth" });
+  }, [token, navigate]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [shared, setShared] = useState<SharedDoc[] | null>(null);
   const [name, setName] = useState("");

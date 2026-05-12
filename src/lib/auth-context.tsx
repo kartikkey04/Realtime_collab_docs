@@ -1,7 +1,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { STORAGE_KEYS } from "./config";
 
-export type User = { id: string; email: string; name: string };
+export type User = {
+  id: string;
+  email?: string;
+  name?: string;
+  phoneNumber?: string;
+  googleId?: string;
+  avatar?: string;
+};
 
 type AuthContextValue = {
   token: string | null;
@@ -14,21 +21,15 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    const t = localStorage.getItem(STORAGE_KEYS.token);
-    const u = localStorage.getItem(STORAGE_KEYS.user);
-    if (t) setToken(t);
-    if (u) {
-      try {
-        setUser(JSON.parse(u));
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
+  const [token, setToken] = useState<string | null>(() =>
+    typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.token) : null
+  );
+  const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === "undefined") return null;
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEYS.user) || "null"); }
+    catch { return null; }
+  });
+  
 
   const setSession = (t: string, u: User) => {
     localStorage.setItem(STORAGE_KEYS.token, t);

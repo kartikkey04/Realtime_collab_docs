@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -58,17 +58,17 @@ const VIEW_KEY = "collab_view_mode";
 const SORT_KEY = "collab_sort_mode";
 
 export const Route = createFileRoute("/dashboard")({
-  beforeLoad: () => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.token) : null;
-    if (!token) throw redirect({ to: "/auth" });
-  },
+  ssr: false,
   component: Dashboard,
 });
 
 function Dashboard() {
   const { token, user, logout } = useAuth();
   const navigate = useNavigate();
+  // dashboard.tsx & editor.$id.tsx — replace your useEffect guard with:
+useEffect(() => {
+  if (!token) navigate({ to: "/auth" });
+}, [token, navigate]); 
   const [docs, setDocs] = useState<DocumentItem[] | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [query, setQuery] = useState("");
@@ -181,10 +181,14 @@ function Dashboard() {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Link to="/profile" className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-secondary text-sm hover:bg-accent transition" title="Profile & shared with me">
-              <div className="w-6 h-6 rounded-full gradient-bg flex items-center justify-center text-xs font-semibold text-primary-foreground">
-                {(user?.name?.[0] ?? "?").toUpperCase()}
+              <div className="w-6 h-6 rounded-full gradient-bg flex items-center justify-center text-xs font-semibold text-primary-foreground overflow-hidden">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  (user?.name?.[0] ?? user?.phoneNumber?.[2] ?? "?").toUpperCase()
+                )}
               </div>
-              <span className="text-foreground font-medium">{user?.name}</span>
+              <span className="text-foreground font-medium">{user?.name || user?.phoneNumber || "User"}</span>
             </Link>
             <Link to="/profile" className="sm:hidden p-1.5 rounded-md border border-border hover:bg-accent" aria-label="Profile">
               <UserCircle2 size={16} />
@@ -566,7 +570,7 @@ function DocCard({
             <span>{timeAgo(doc.updatedAt)}</span>
           </div>
         </Link>
-        <div className="absolute top-1/2 -translate-y-1/2 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <div className="absolute top-1/2 -translate-y-1/2 right-3 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
           <CardActionButton
             onClick={stop(onRename)}
             label={`Rename ${doc.title}`}
@@ -609,7 +613,7 @@ function DocCard({
           <span>{timeAgo(doc.updatedAt)}</span>
         </div>
       </Link>
-      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <div className="absolute top-3 right-3 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100 transition-opacity">
         <CardActionButton
           onClick={stop(onRename)}
           label={`Rename ${doc.title}`}

@@ -42,7 +42,10 @@ export async function apiFetch<T = any>(
   }
 
   if (!res.ok) {
-    if (res.status === 401) {
+    // Only force-logout on 401 when we actually sent a token.
+    // Prevents a refresh race (token not yet wired into a fetch) from
+    // logging the user out.
+    if (res.status === 401 && token) {
       localStorage.removeItem(STORAGE_KEYS.token);
       localStorage.removeItem(STORAGE_KEYS.user);
       if (typeof window !== "undefined" && !window.location.pathname.startsWith("/auth")) {

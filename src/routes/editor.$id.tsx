@@ -1,4 +1,4 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { toast } from "sonner";
@@ -32,17 +32,19 @@ type FontMode = "serif" | "mono";
 type SidePanel = "comments" | "versions" | "ai" | null;
 
 export const Route = createFileRoute("/editor/$id")({
-  beforeLoad: () => {
-    const token =
-      typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEYS.token) : null;
-    if (!token) throw redirect({ to: "/auth" });
-  },
+  ssr: false,
   component: Editor,
 });
 
 function Editor() {
   const { id } = Route.useParams();
   const { token } = useAuth();
+  const navigate = useNavigate();
+
+useEffect(() => {
+  if (!token) navigate({ to: "/auth" });
+}, [token, navigate]);
+
 
   const [doc, setDoc] = useState<DocumentDetail | null>(null);
   const [content, setContent] = useState("");
@@ -209,6 +211,8 @@ function Editor() {
     return { words, chars, minutes };
   }, [content]);
 
+  if (!token) return null;
+
   if (!doc) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-3 text-muted-foreground">
@@ -355,7 +359,7 @@ function PanelButton({ active, onClick, title, children }: { active: boolean; on
     <button
       onClick={onClick}
       title={title}
-      aria-pressed={active}
+      aria-pressed={active ? "true" : "false"}
       className={`inline-flex items-center justify-center w-9 h-9 rounded-md border transition ${
         active ? "bg-primary text-primary-foreground border-primary" : "border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent"
       }`}

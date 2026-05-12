@@ -71,7 +71,17 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+
+      // Add the COOP header to allow Google Login popups to communicate back to the app
+      const headers = new Headers(normalized.headers);
+      headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+
+      return new Response(normalized.body, {
+        status: normalized.status,
+        statusText: normalized.statusText,
+        headers,
+      });
     } catch (error) {
       console.error(error);
       return brandedErrorResponse();
